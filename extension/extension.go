@@ -68,6 +68,9 @@ func getConfig(filename string) *Config {
 			if config.SecretManagers[i].Secrets[j].Filename == "" {
 				config.SecretManagers[i].Secrets[j].Filename = config.SecretManagers[i].Secrets[j].Secretname
 			}
+			if config.SecretManagers[i].Secrets[j].Envvar == "" {
+				config.SecretManagers[i].Secrets[j].Envvar = config.SecretManagers[i].Envvar
+			}
 		}
 	}
 
@@ -115,7 +118,11 @@ func populateSecrets(config *Config) {
 	for i := range config.SecretManagers {
 		for j := range config.SecretManagers[i].Secrets {
 			secretid := fmt.Sprintf("%s%s", config.SecretManagers[i].Prefix, config.SecretManagers[i].Secrets[j].Secretname)
-			go handleSecret(*awsSecretsManager, secretid, config.SecretManagers[i].Secrets[j].Filename, config, errchan)
+			use_envvar := false
+			if config.secretManagers[i].Secrets[j].Envvar != "" {
+				use_envvar = true
+			}
+			go handleSecret(*awsSecretsManager, secretid, config.SecretManagers[i].Secrets[j].Filename, config, use_envvar, errchan)
 		}
 	}
 
@@ -131,14 +138,17 @@ func populateSecrets(config *Config) {
 	close(errchan)
 }
 
-func handleSecret(sm secrets.AWSSecrets, secretid string, filename string, config *Config, errchan chan<- error) {
+func handleSecret(sm secrets.AWSSecrets, secretid string, filename string, config *Config, use_envvar, errchan chan<- error) {
 	thesecret, err := getSecret(sm, secretid)
 	if err != nil {
 		errchan <- fmt.Errorf("[Extension] ERROR reading secret (%s): %v", secretid, err)
 		return
 	}
-
-	err = putSecret(thesecret, filename, config)
+	if use_envvar == false {
+		err = putSecret(thesecret, filename, config)
+	} else {
+		err = putSecretEnv(thesecret, filename, config)
+	}
 	errchan <- err
 }
 
@@ -236,6 +246,20 @@ func putSecret(secret *string, target string, config *Config) error {
 	err := ioutil.WriteFile(fname, d1, 0644)
 	if err != nil {
 		log.Errorf("[extension] Writing secret error: %v", err)
+		return err
+	}
+	return nil
+}
+
+func putSecretEnv(secret *string, target string, config *Config) error {
+	if secret == nil {
+		log.Infof("[Extension] Secret %v is unassigned", secret)
+		return nil
+	}
+	log.Infof("[extension] Writing %v", fname)
+	err := os.Setenv(target, secret)
+	if err != nil {
+		log.Errorf("[extension] Writing secret env var error: %v", err)
 		return err
 	}
 	return nil
