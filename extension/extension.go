@@ -28,11 +28,13 @@ type Config struct {
 type SecretManagers struct {
 	Prefix  string    `yaml:prefix`
 	Secrets []Secrets `yaml:Secrets`
+	Envvar  string    `yaml:envvar`
 }
 
 type Secrets struct {
 	Secretname string `yaml:secretname`
 	Filename   string `yaml:filename`
+	Envvar     string `yaml:envvar`
 }
 
 // SetLogLevelFromEnv reads the LOG_LEVEL environtment variable for DEBUG or TRACE and updates log verbosity accordingly
@@ -119,7 +121,7 @@ func populateSecrets(config *Config) {
 		for j := range config.SecretManagers[i].Secrets {
 			secretid := fmt.Sprintf("%s%s", config.SecretManagers[i].Prefix, config.SecretManagers[i].Secrets[j].Secretname)
 			use_envvar := false
-			if config.secretManagers[i].Secrets[j].Envvar != "" {
+			if config.SecretManagers[i].Secrets[j].Envvar != "" {
 				use_envvar = true
 			}
 			go handleSecret(*awsSecretsManager, secretid, config.SecretManagers[i].Secrets[j].Filename, config, use_envvar, errchan)
@@ -138,7 +140,7 @@ func populateSecrets(config *Config) {
 	close(errchan)
 }
 
-func handleSecret(sm secrets.AWSSecrets, secretid string, filename string, config *Config, use_envvar, errchan chan<- error) {
+func handleSecret(sm secrets.AWSSecrets, secretid string, filename string, config *Config, use_envvar bool, errchan chan<- error) {
 	thesecret, err := getSecret(sm, secretid)
 	if err != nil {
 		errchan <- fmt.Errorf("[Extension] ERROR reading secret (%s): %v", secretid, err)
@@ -256,8 +258,8 @@ func putSecretEnv(secret *string, target string, config *Config) error {
 		log.Infof("[Extension] Secret %v is unassigned", secret)
 		return nil
 	}
-	log.Infof("[extension] Writing %v", fname)
-	err := os.Setenv(target, secret)
+	log.Infof("[extension] Writing %v", target)
+	err := os.Setenv(target, *secret)
 	if err != nil {
 		log.Errorf("[extension] Writing secret env var error: %v", err)
 		return err
