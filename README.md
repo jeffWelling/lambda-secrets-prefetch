@@ -21,6 +21,20 @@ export AWS_PROFILE=<profile name>
 export AWS_REGION=<region to run in>
 ```
 
+## First Run
+
+The first run needs to be done by hand to set the .layer.arn.txt file that the Makefile usese for subsequent runs
+Comment out the ARN variable at the top of the Makefile and run `make build-extension`, then run:
+
+```
+aws lambda publish-layer-version \
+	--layer-name "${LAYER_NAME}" \
+	--compatible-runtimes go1.x ruby2.7 python3.7 \
+	--region "${AWS_REGION}" \
+	--zip-file  "fileb://build/extensions.zip"
+```
+
+
 ### config.yaml
 This extension reads a `config.yaml` file from the root of the lambda function package. For example:
 
