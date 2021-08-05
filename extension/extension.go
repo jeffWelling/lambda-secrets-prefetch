@@ -87,7 +87,7 @@ func main() {
 	log.Infof("[extension] got base url %s", baseURL)
 	client = &http.Client{}
 
-	config := getConfig("/var/task/config.yaml")
+	config := getConfig("/opt/config.yaml")
 
 	// Fetching from secrets manager and writing to disk
 	populateSecrets(config)
